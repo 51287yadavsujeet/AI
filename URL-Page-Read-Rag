@@ -1,0 +1,120 @@
+# -----------------------------------------------------------
+# 1. Install and import everything we need
+# -----------------------------------------------------------
+!pip -q install --upgrade langchain langchain-google-genai faiss-cpu \
+                         beautifulsoup4  tiktoken langchain-community
+!pip install requests==2.32.3
+
+import os, textwrap, requests, faiss, json, time
+from bs4 import BeautifulSoup
+from langchain_google_genai import (
+    GoogleGenerativeAIEmbeddings,
+    ChatGoogleGenerativeAI,
+)
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+# Import FAISS from langchain_community
+from langchain_community.vectorstores import FAISS
+from langchain.schema import Document
+from langchain.chains import RetrievalQA
+
+# -----------------------------------------------------------
+# 2. Configure your Gemini API key
+# -----------------------------------------------------------
+os.environ["GOOGLE_API_KEY"] = "AIzaSyDOf-ICLBbumX9SLUQ6NDxRUSVPRkmzYp8"
+
+# -----------------------------------------------------------
+# 3. Define the web pages you want to ingest
+#    – use base + relative paths so it’s easy to add/remove
+# -----------------------------------------------------------
+base_url = "https://www.educosys.com"
+paths = [
+    "/",                 # home page
+    "/about-us",
+    "/services",
+    "/contact-us",
+]
+
+def fetch_clean_text(full_url: str, sleep=2) -> str:
+    """Download a web page and return plain visible text."""
+    try:
+        print(f"📥  Fetching {full_url}")
+        headers = {"User-Agent": "Mozilla/5.0"}
+        html = requests.get(full_url, headers=headers, timeout=15).content
+        soup = BeautifulSoup(html, "html.parser")
+        # remove scripts/styles
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n")
+        # compress multiple blank lines
+        cleaned = "\n".join(
+            [line.strip() for line in text.splitlines() if line.strip()]
+        )
+        time.sleep(sleep)          # be polite to the server
+        return cleaned
+    except Exception as ex:
+        print(f"⚠️  Failed on {full_url}: {ex}")
+        return ""
+
+# -----------------------------------------------------------
+# 4. Crawl every path and build a list of LangChain Documents
+# -----------------------------------------------------------
+docs: list[Document] = []
+for path in paths:
+    url = f"{base_url}{path}"
+    page_text = fetch_clean_text(url)
+    if not page_text:
+        continue
+
+    # split into ~1 000‑token chunks with 100‑token overlap
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, chunk_overlap=100, separators=["\n", " ", ""]
+    )
+    for chunk in splitter.split_text(page_text):
+        docs.append(Document(page_content=chunk, metadata={"source": url}))
+
+print(f"✅ Collected {len(docs)} text chunks")
+
+# -----------------------------------------------------------
+# 5. Embed & index with Gemini embeddings + FAISS
+#    – if you run again, we load from disk to save quota
+# -----------------------------------------------------------
+index_dir = "faiss_educo_index"
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001"  # 3072‑dim gemini embeddings
+)
+
+if os.path.exists(index_dir):
+    print("📂  Loading existing FAISS index from disk")
+    vectordb = FAISS.load_local(index_dir, embeddings)
+else:
+    vectordb = FAISS.from_documents(docs, embeddings)
+    vectordb.save_local(index_dir)
+    print(f"💾  Saved FAISS index to {index_dir}")
+
+# -----------------------------------------------------------
+# 6. Build the Retrieval‑Augmented QA chain with Gemini‑Pro
+# -----------------------------------------------------------
+llm = ChatGoogleGenerativeAI(
+    model="gemini-pro",
+    temperature=0.3,
+    convert_system_message_to_human=True,
+)
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=vectordb.as_retriever(),
+    return_source_documents=True,
+)
+
+# -----------------------------------------------------------
+# 7. Ask your questions!
+# -----------------------------------------------------------
+while True:
+    query = input("\n🔎 Ask a question (or 'quit'): ").strip()
+    if query.lower() in {"quit", "exit"}:
+        break
+    result = qa_chain(query)
+    print("\n📝  Answer:\n", textwrap.fill(result["result"], width=100))
+    print("\n🔖  Sources:")
+    for doc in result["source_documents"]:
+        print("  •", doc.metadata["source"])
