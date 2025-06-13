@@ -1,10 +1,6 @@
-# -----------------------------------------------------------
-# 1. Install and import everything we need
-# -----------------------------------------------------------
 !pip -q install --upgrade langchain langchain-google-genai faiss-cpu \
                          beautifulsoup4  tiktoken langchain-community
 !pip install requests==2.32.3
-
 import os, textwrap, requests, faiss, json, time
 from bs4 import BeautifulSoup
 from langchain_google_genai import (
@@ -17,12 +13,8 @@ from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 from langchain.chains import RetrievalQA
 
-# -----------------------------------------------------------
-# 2. Configure your Gemini API key
-# -----------------------------------------------------------
+#Configure your Gemini API key
 os.environ["GOOGLE_API_KEY"] = "AIzaSyDOf-ICLBbumX9SLUQ6NDxRUSVPRkmzYp8"
-
-# -----------------------------------------------------------
 # 3. Define the web pages you want to ingest
 #    – use base + relative paths so it’s easy to add/remove
 # -----------------------------------------------------------
@@ -80,9 +72,9 @@ print(f"✅ Collected {len(docs)} text chunks")
 # -----------------------------------------------------------
 index_dir = "faiss_educo_index"
 embeddings = GoogleGenerativeAIEmbeddings(
+## we need to define the Model here and ??????-Getting quota related issue.
     model="models/embedding-001"  # 3072‑dim gemini embeddings
 )
-
 if os.path.exists(index_dir):
     print("📂  Loading existing FAISS index from disk")
     vectordb = FAISS.load_local(index_dir, embeddings)
@@ -90,7 +82,6 @@ else:
     vectordb = FAISS.from_documents(docs, embeddings)
     vectordb.save_local(index_dir)
     print(f"💾  Saved FAISS index to {index_dir}")
-
 # -----------------------------------------------------------
 # 6. Build the Retrieval‑Augmented QA chain with Gemini‑Pro
 # -----------------------------------------------------------
@@ -99,13 +90,11 @@ llm = ChatGoogleGenerativeAI(
     temperature=0.3,
     convert_system_message_to_human=True,
 )
-
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     retriever=vectordb.as_retriever(),
     return_source_documents=True,
 )
-
 # -----------------------------------------------------------
 # 7. Ask your questions!
 # -----------------------------------------------------------
