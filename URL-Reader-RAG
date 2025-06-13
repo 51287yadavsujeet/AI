@@ -19,6 +19,7 @@ os.environ["GOOGLE_API_KEY"] = "AIzaSyDOf-ICLBbumX9SLUQ6NDxRUSVPRkmzYp8"
 #    – use base + relative paths so it’s easy to add/remove
 # -----------------------------------------------------------
 base_url = "https://www.educosys.com"
+## one more way where we can add many path like confluence and give the all dumps of URL and fetch the details.
 paths = [
     "/",                 # home page
     "/about-us",
@@ -72,8 +73,7 @@ print(f"✅ Collected {len(docs)} text chunks")
 # -----------------------------------------------------------
 index_dir = "faiss_educo_index"
 embeddings = GoogleGenerativeAIEmbeddings(
-## we need to define the Model here and ??????-Getting quota related issue.
-    model="models/embedding-001"  # 3072‑dim gemini embeddings
+ model="models/embedding-001"  # 3072‑dim gemini embeddings
 )
 if os.path.exists(index_dir):
     print("📂  Loading existing FAISS index from disk")
@@ -86,8 +86,15 @@ else:
 # 6. Build the Retrieval‑Augmented QA chain with Gemini‑Pro
 # -----------------------------------------------------------
 llm = ChatGoogleGenerativeAI(
+## we need to define the Model here and ??????-Getting quota related issue. so need help here which model we can use.???
     model="gemini-pro",
-    temperature=0.3,
+## we can tune the temperature to controls randomness or creativity
+##0.0	Deterministic (no randomness)	Factual tasks like coding, math, summaries
+##0.3	Slight randomness	Balanced answers: mostly factual, a bit flexible
+##0.7	More creative/varied	Writing poetry, stories, brainstorming
+##1.0+	Very random, less accurate	Experimental or creative writing
+  
+temperature=0.3,
     convert_system_message_to_human=True,
 )
 qa_chain = RetrievalQA.from_chain_type(
