@@ -1,0 +1,23 @@
+Steps:
+1-Generating the Random data for API responce
+2-Feeding to QA Assistance
+3-QA is Asking the Details of Failure.
+4-extract response with latest data only based on last success response for enpoint
+
+streamlit run Splunk_Logs.py
+
+splunk_logs2.csv
+
+https://www.loom.com/share/86e16b4d52d94f9fa2b00310f9dce19d?sid=0ecb2ae2-07c1-4ac5-bc4a-3861339887b7
+
+-Query:
+
+which top 3 API is failing share the root cause in short 2lines each for it and share the status code with count of each.
+
+fetch response with  data only based on last success response for enpoint /api/v1/users/1858.
+When was the last success response from the endpoint  /api/v1/users/1858
+ 
+When was the last success response from InventoryService
+
+When was the last failure  response from InventoryService
+ 
